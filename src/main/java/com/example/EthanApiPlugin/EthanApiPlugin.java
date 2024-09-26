@@ -9,6 +9,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.inject.Inject;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.*;
 import net.runelite.api.coords.LocalPoint;
 import net.runelite.api.coords.WorldPoint;
@@ -31,6 +32,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static net.runelite.api.Varbits.QUICK_PRAYER;
@@ -41,6 +43,7 @@ import static net.runelite.api.Varbits.QUICK_PRAYER;
         tags = {"ethan"},
         hidden = false
 )
+@Slf4j
 public class EthanApiPlugin extends Plugin {
 
     static ClientUI clientUI = RuneLite.getInjector().getInstance(ClientUI.class);
@@ -1156,5 +1159,262 @@ public class EthanApiPlugin extends Plugin {
         eventBus.register(RuneLite.getInjector().getInstance(DepositBox.class));
         eventBus.register(RuneLite.getInjector().getInstance(ShopInventory.class));
         eventBus.register(RuneLite.getInjector().getInstance(Shop.class));
+    }
+
+    public static List<WorldPoint> pathToClosestGoalSet(HashSet<WorldPoint> goalSet, HashSet<WorldPoint> dangerous, HashSet<WorldPoint> impassible, HashSet<WorldPoint> walkable, WorldPoint starting) {
+        if (Collections.disjoint(goalSet, walkable)) {
+            return null;
+        }
+        ArrayDeque<Node> queue = new ArrayDeque<Node>();
+        HashSet<WorldPoint> visited = new HashSet<>();
+        visited.add(starting);
+        queue.add(new Node(starting));
+
+        Node closestNode = new Node(starting);
+        double closestDistance = Double.MAX_VALUE;
+
+        // Helper function to calculate the minimum distance to the goal set
+        Function<WorldPoint, Double> minDistanceToGoal = (point) -> goalSet.stream()
+                .mapToDouble(goal -> point.distanceTo(goal)) // Assuming WorldPoint has a method distanceTo
+                .min().orElse(Double.MAX_VALUE);
+
+
+        while (!queue.isEmpty()) {
+            Node current = queue.poll();
+            WorldPoint currentPoint = current.getData();
+
+            double currentDistance = minDistanceToGoal.apply(currentPoint);
+            if (currentDistance < closestDistance) {
+                closestDistance = currentDistance;
+                closestNode = current;
+            }
+
+
+            if (goalSet.contains(currentPoint)) {
+                return buildPath(current);
+            }
+            for (int[] direction : directionsMap) {
+                int x = direction[0];
+                int y = direction[1];
+                if (x == 0 && y == 0) {
+                    continue;
+                }
+                WorldPoint nextPoint = current.getData().dy(y).dx(x);
+                if (!walkable.contains(nextPoint) || impassible.contains(nextPoint) || dangerous.contains(nextPoint) || visited.contains(nextPoint)) {
+                    continue;
+                }
+                if (x == -2 && y == 0) {
+                    if (farWObstructed(currentPoint, impassible, walkable)) {
+                        continue;
+                    }
+                    visited.add(nextPoint);
+                    queue.add(new Node(nextPoint, current));
+                    continue;
+                }
+                //Far East
+                if (x == 2 && y == 0) {
+                    if (farEObstructed(currentPoint, impassible, walkable)) {
+                        continue;
+                    }
+                    visited.add(nextPoint);
+                    queue.add(new Node(nextPoint, current));
+                    continue;
+                }
+                //Far South
+                if (x == 0 && y == -2) {
+                    if (farSObstructed(currentPoint, impassible, walkable)) {
+                        continue;
+                    }
+                    visited.add(nextPoint);
+                    queue.add(new Node(nextPoint, current));
+                    continue;
+                }
+                //Far North
+                if (x == 0 && y == 2) {
+                    if (farNObstructed(currentPoint, impassible, walkable)) {
+                        continue;
+                    }
+                    visited.add(nextPoint);
+                    queue.add(new Node(nextPoint, current));
+                    continue;
+                }
+                //far movements
+                //L movement in here so i dont get lost in the saauce down there
+                if (Math.abs(x) + Math.abs(y) == 3) {
+                    //North east
+                    if (x == 1 && y == 2) {
+                        if (northEastLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //East north
+                    if (x == 2 && y == 1) {
+                        if (eastNorthLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //East south
+                    if (x == 2 && y == -1) {
+                        if (eastSouthLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //South east
+                    if (x == 1 && y == -2) {
+                        if (southEastLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //South west
+                    if (x == -1 && y == -2) {
+                        if (southWestLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //West south
+                    if (x == -2 && y == -1) {
+                        if (westSouthLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //West north
+                    if (x == -2 && y == 1) {
+                        if (westNorthLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //North west
+                    if (x == -1 && y == 2) {
+                        if (northWestLObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                } else {
+                    //One tile movement
+
+                    //diagonal SE
+                    if (x == 1 && y == -1) {
+                        if (seObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //diagonal NE
+                    if (x == 1 && y == 1) {
+                        if (neObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //diagonal NW
+                    if (x == -1 && y == 1) {
+                        if (nwObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //diagonal SW
+                    if (x == -1 && y == -1) {
+                        if (swObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+
+                    //Two tile movement
+
+                    //Diagonal SW
+                    if (x == -2 && y == -2) {
+                        if (farSWObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //Diagonal NW
+                    if (x == -2 && y == 2) {
+                        if (farNWObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //Diagonal SE
+                    if (x == 2 && y == -2) {
+                        if (farSEObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                    //Diagonal NE
+                    if (x == 2 && y == 2) {
+                        if (farNEObstructed(currentPoint, impassible, walkable)) {
+                            continue;
+                        }
+                        visited.add(nextPoint);
+                        queue.add(new Node(nextPoint, current));
+                        continue;
+                    }
+                }
+            }
+        }
+        if (closestDistance < Double.MAX_VALUE) {
+            return buildPath(closestNode);
+        } else {
+            log.info("No path found");
+            return null; // In case there's no reachable point at all.
+        }
+    }
+
+    // Utility method to build path from a node to the start
+    private static List<WorldPoint> buildPath(Node node) {
+        List<WorldPoint> path = new ArrayList<>();
+        while (node != null) {
+            path.add(node.getData());
+            node = node.getPrevious();
+        }
+        Collections.reverse(path);
+        path.remove(0); // Assuming you still want to remove the starting point as in your original method
+        return path;
+    }
+
+    public static List<WorldPoint> pathToClosestGoalFromPlayerUsingCustomDangerous(WorldPoint goal, HashSet<WorldPoint> dangerous) {
+        return pathToClosestGoalSet(new HashSet<>(List.of(goal)), EMPTY_SET, dangerous, new HashSet<>(reachableTiles()), playerPosition());
     }
 }
