@@ -775,6 +775,11 @@ public class BankItemWidget implements Widget {
     }
 
     @Override
+    public int[] getVarTransmitTrigger() {
+        return null;
+    }
+
+    @Override
     public void setVarTransmitTrigger(int... trigger) {
 
     }

@@ -14,7 +14,7 @@ import net.runelite.client.externalplugins.ExternalPluginManager;
 
 public class ExamplePluginTest {
     public static void main(String[] args) throws Exception {
-        ExternalPluginManager.loadBuiltin(EthanApiPlugin.class, PacketUtilsPlugin.class, FishingFriendPlugin.class, ToaExtendedPlugin.class);
+        ExternalPluginManager.loadBuiltin(EthanApiPlugin.class, PacketUtilsPlugin.class);
         RuneLite.main(args);
     }
 }
