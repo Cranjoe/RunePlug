@@ -505,11 +505,6 @@ public class BankItemWidget implements Widget {
     }
 
     @Override
-    public void clearActions() {
-
-    }
-
-    @Override
     public void setOnOpListener(Object... args) {
 
     }
